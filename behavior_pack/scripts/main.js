@@ -2,6 +2,7 @@ import { world, system, Player } from "@minecraft/server";
 import { ActionFormData, MessageFormData } from "@minecraft/server-ui";
 import { LESSONS, getLesson } from "./lessons.js";
 import { fmt, cmd, showForm, isBook, giveBook, resetPlayer, sleep } from "./util.js";
+import { runs, runMenu, runStartMenu, stopRun, onDimensionChange, onDragonDeath } from "./run.js";
 
 /** player.id -> { lesson, state, startMs (0 until GO), player } */
 const sessions = new Map();
@@ -11,10 +12,12 @@ const sessions = new Map();
 async function openMenu(player) {
   const s = sessions.get(player.id);
   if (s) return sessionMenu(player, s);
+  if (runs.has(player.id)) return runMenu(player);
 
   const form = new ActionFormData()
     .title("Speedrun Academy")
-    .body("§7Pick a lesson. Each one teaches a piece of the Any% route, then times you doing it.");
+    .body("§7Do a §fGuided Run§7 with a live checklist, or drill one piece of the route in a lesson.");
+  form.button("§6Guided Run + Checklist", "textures/items/map_filled");
   for (const l of LESSONS) {
     const pb = getPB(player, l.id);
     form.button(l.read ? l.name : `${l.name}${pb ? `\n§2PB ${fmt(pb)}` : "\n§8no PB yet"}`, l.icon);
@@ -23,8 +26,9 @@ async function openMenu(player) {
 
   const res = await showForm(player, form);
   if (!res || res.canceled || res.selection === undefined) return;
-  if (res.selection === LESSONS.length) return showPBs(player);
-  return lessonIntro(player, LESSONS[res.selection]);
+  if (res.selection === 0) return runStartMenu(player, () => openMenu(player));
+  if (res.selection === LESSONS.length + 1) return showPBs(player);
+  return lessonIntro(player, LESSONS[res.selection - 1]);
 }
 
 async function lessonIntro(player, lesson, page = 0) {
@@ -84,6 +88,8 @@ async function showPBs(player) {
     const tries = player.getDynamicProperty(`tries:${l.id}`) ?? 0;
     return `§f${l.name}\n  §7PB: ${pb ? `§a${fmt(pb)}` : "§8-"}§7   attempts: ${tries}`;
   });
+  const runPB = /** @type {number|undefined} */ (player.getDynamicProperty("run:pb"));
+  lines.unshift(`§6Guided Run (full)\n  §7PB: ${runPB ? `§a${fmt(runPB)}` : "§8-"}`);
   const form = new MessageFormData()
     .title("Personal Bests")
     .body(lines.join("\n\n"))
@@ -102,6 +108,7 @@ async function startLesson(player, lesson) {
     return;
   }
 
+  stopRun(player, true);
   const s = { lesson, state: {}, startMs: 0, player };
   sessions.set(player.id, s);
   const tries = /** @type {number} */ (player.getDynamicProperty(`tries:${lesson.id}`) ?? 0);
@@ -194,11 +201,13 @@ world.afterEvents.playerSpawn.subscribe(({ player }) => giveBook(player));
 world.afterEvents.playerDimensionChange.subscribe(({ player, toDimension }) => {
   const s = sessions.get(player.id);
   if (s?.startMs && s.lesson.onDimension?.(player, s.state, toDimension.id)) finish(s);
+  onDimensionChange(player, toDimension.id);
 });
 
 world.afterEvents.entityDie.subscribe(({ deadEntity }) => {
   if (deadEntity.typeId === "minecraft:ender_dragon") {
     for (const s of [...sessions.values()]) if (s.startMs && s.lesson.onDragonDeath) finish(s);
+    onDragonDeath();
     return;
   }
   if (deadEntity instanceof Player) {
@@ -207,4 +216,7 @@ world.afterEvents.entityDie.subscribe(({ deadEntity }) => {
   }
 });
 
-world.afterEvents.playerLeave.subscribe(({ playerId }) => sessions.delete(playerId));
+world.afterEvents.playerLeave.subscribe(({ playerId }) => {
+  sessions.delete(playerId);
+  runs.delete(playerId);
+});

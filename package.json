@@ -1,10 +1,11 @@
 {
   "name": "speedrun-academy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Bedrock practice add-on that teaches speedrunning",
   "scripts": {
-    "check": "tsc -p jsconfig.json",
+    "check": "tsc -p jsconfig.json && node tools/check-ids.mjs",
+    "test": "node --no-warnings tools/test/checklist.test.mjs",
     "build": "bash tools/build.sh"
   },
   "devDependencies": {

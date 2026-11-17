@@ -1,5 +1,6 @@
 import { world } from "@minecraft/server";
 import { cmd, give, countItem, sleep } from "./util.js";
+import { markThrow } from "./tri.js";
 
 const OVERWORLD = "minecraft:overworld";
 const NETHER = "minecraft:nether";
@@ -179,7 +180,7 @@ export const LESSONS = [
           break;
         }
       }
-      give(p, "minecraft:white_bed", 8);
+      give(p, "minecraft:bed", 8);
       give(p, "minecraft:iron_sword");
       give(p, "minecraft:iron_pickaxe");
       give(p, "minecraft:bow");
@@ -205,7 +206,7 @@ export const LESSONS = [
         }
       }
     },
-    progress: (p) => `beds ${countItem(p, "minecraft:white_bed")}`,
+    progress: (p) => `beds ${countItem(p, "minecraft:bed")}`,
     onDragonDeath: true,
   },
 ];
@@ -217,50 +218,4 @@ export function getLesson(id) {
 function countLogs(p) {
   const logs = ["oak", "spruce", "birch", "jungle", "acacia", "dark_oak", "mangrove", "cherry", "pale_oak"];
   return logs.reduce((n, w) => n + countItem(p, `minecraft:${w}_log`), 0);
-}
-
-// ---------- triangulation ----------
-
-function markThrow(p, s) {
-  const v = p.getViewDirection();
-  const len = Math.hypot(v.x, v.z);
-  if (len < 0.2) {
-    p.sendMessage("§cYou're looking too far up/down. Look at the hovering eye, then mark.");
-    return;
-  }
-  const mark = { x: p.location.x, z: p.location.z, dx: v.x / len, dz: v.z / len };
-  s.marks.push(mark);
-  if (s.marks.length > 2) s.marks.shift();
-  const bearing = Math.round((Math.atan2(-mark.dx, mark.dz) * 180) / Math.PI);
-  p.sendMessage(`§aThrow marked§7 at §f${Math.round(mark.x)}, ${Math.round(mark.z)}§7 facing §f${bearing}°`);
-
-  if (s.marks.length < 2) {
-    p.sendMessage("§7Now move ~200 blocks §fsideways§7 to the eye's direction and throw again.");
-    return;
-  }
-  const [a, b] = s.marks;
-  const sep = Math.hypot(b.x - a.x, b.z - a.z);
-  const angle = (Math.acos(Math.max(-1, Math.min(1, a.dx * b.dx + a.dz * b.dz))) * 180) / Math.PI;
-  const hit = intersect(a, b);
-  if (!hit) {
-    p.sendMessage(`§cThe two lines are almost parallel (${angle.toFixed(1)}° apart). Move further sideways and throw again.`);
-    return;
-  }
-  const dist = Math.round(Math.hypot(hit.x - p.location.x, hit.z - p.location.z));
-  p.sendMessage(
-    `§6Stronghold estimate:§f ${Math.round(hit.x)}, ${Math.round(hit.z)}§7  (${dist} blocks away)\n` +
-      `§cNether:§f ${Math.round(hit.x / 8)}, ${Math.round(hit.z / 8)}\n` +
-      `§7Throws were ${Math.round(sep)} blocks apart, lines cross at ${angle.toFixed(1)}°.` +
-      (angle < 5 ? " §eLow angle = shaky estimate. Spread throws out more." : " §aGood spread.")
-  );
-}
-
-/** Intersect two rays (x,z + t*(dx,dz)); null if parallel or behind either thrower. */
-function intersect(a, b) {
-  const den = a.dx * b.dz - a.dz * b.dx;
-  if (Math.abs(den) < 1e-4) return null;
-  const t = ((b.x - a.x) * b.dz - (b.z - a.z) * b.dx) / den;
-  const u = ((b.x - a.x) * a.dz - (b.z - a.z) * a.dx) / den;
-  if (t < 0 || u < 0) return null;
-  return { x: a.x + a.dx * t, z: a.z + a.dz * t };
 }

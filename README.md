@@ -4,6 +4,22 @@ A **practice-only** behavior pack that teaches Bedrock Any% speedrunning. It has
 
 > ⚠️ Never have this pack on during a real run. Leaderboards require vanilla Minecraft. Behavior packs also disable achievements on the world they're applied to.
 
+## Guided Run + Checklist (new in 0.2)
+
+A full Any% run with coaching:
+
+- **Live checklist on the right side of the screen** (the scoreboard sidebar, so it needs no extra textures). It reads your inventory and ticks items off as you get them: green = done, red = still needed, gray = optional. It switches phases automatically when you change dimension (Overworld → Nether → Stronghold → The End).
+- **Action bar** shows the timer, the next thing to get, and an inventory-full warning.
+- **"What do I do next?"** explains how to get the next item (where iron comes from, how to find flint, and so on).
+- **Phase guides** cover pathing: what to look for in your first 10 seconds, how to find a lava pool, how to read the Nether, and how to dig into a stronghold.
+- **Scout** (training wheels) finds the nearest lava, ruined portal, village, iron, gravel, bastion, gold block or fortress, then points you there with an arrow and tells you what it looks like so you learn to spot it yourself. Timed runs that use Scout don't save a PB.
+- **Inventory check** compares your hotbar to a recommended layout for the current phase, flags junk and block clutter, and can arrange the hotbar for you.
+- **Splits** for each phase, with your best segments saved.
+
+There are two modes. **Timed** clears your inventory and is meant for a brand new world. **Checklist only** keeps your stuff and has no timer.
+
+Only one checklist fits on the shared sidebar, so in multiplayer it shows the most recent player who started a run.
+
 ## Lessons
 
 | # | Lesson | Where to start | Goal |
@@ -34,7 +50,8 @@ Minecraft Bedrock **1.21.90+**. It uses the stable Script API (`@minecraft/serve
 
 ```
 npm install
-npm run check   # typecheck scripts against the Script API
+npm run check   # typecheck scripts against the Script API + validate item/block ids
+npm test        # checklist logic tests (mocked game API)
 npm run build   # -> dist/SpeedrunAcademy.mcpack
 ```
 
