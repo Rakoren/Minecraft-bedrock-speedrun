@@ -1,41 +1,108 @@
 {
-  "format_version": 2,
+  "format_version": 3,
   "header": {
     "name": "Speedrun Academy",
-    "description": "Practice add-on that teaches Bedrock speedrunning. Practice worlds only - never use in a real run.",
+    "description": "Practice add-on that teaches Bedrock speedrunning: guided runs, checklists, lessons and races. Practice worlds only - never use in a real run.",
     "uuid": "8cc9e814-0c3b-4c0c-83eb-51d20d69f51a",
-    "version": [
-      0,
-      2,
-      0
-    ],
-    "min_engine_version": [
-      1,
-      21,
-      90
-    ]
+    "version": "0.3.0",
+    "min_engine_version": "1.26.50"
   },
   "modules": [
     {
       "type": "script",
       "language": "javascript",
       "uuid": "7f142ac1-0329-45a9-ba79-a9f44e66d100",
-      "version": [
-        0,
-        2,
-        0
-      ],
+      "version": "0.3.0",
       "entry": "scripts/main.js"
     }
   ],
   "dependencies": [
     {
       "module_name": "@minecraft/server",
-      "version": "2.0.0"
+      "version": "2.9.0"
     },
     {
       "module_name": "@minecraft/server-ui",
       "version": "2.0.0"
+    }
+  ],
+  "settings": [
+    {
+      "type": "label",
+      "text": "Speedrun Academy - set up your practice world. You can change all of this later from the book (World setup)."
+    },
+    {
+      "type": "dropdown",
+      "name": "academy:mode",
+      "text": "Mode",
+      "default": "practice",
+      "options": [
+        {
+          "name": "practice",
+          "text": "Practice / Guided run"
+        },
+        {
+          "name": "race_world",
+          "text": "Race: same world"
+        },
+        {
+          "name": "race_seed",
+          "text": "Race: same seed, separate worlds"
+        }
+      ]
+    },
+    {
+      "type": "dropdown",
+      "name": "academy:start_type",
+      "text": "Start type (the pack finds one and moves spawn there)",
+      "default": "random",
+      "options": [
+        {
+          "name": "random",
+          "text": "Random (normal spawn)"
+        },
+        {
+          "name": "village",
+          "text": "Village"
+        },
+        {
+          "name": "ruined_portal",
+          "text": "Ruined portal"
+        },
+        {
+          "name": "shipwreck",
+          "text": "Shipwreck"
+        },
+        {
+          "name": "buried_treasure",
+          "text": "Buried treasure"
+        },
+        {
+          "name": "lava_pool",
+          "text": "Lava pool (desert/badlands)"
+        }
+      ]
+    },
+    {
+      "type": "toggle",
+      "name": "academy:allow_scout",
+      "text": "Allow Scout (training wheels)",
+      "default": true
+    },
+    {
+      "type": "toggle",
+      "name": "academy:race_pvp",
+      "text": "PvP during same-world races",
+      "default": false
+    },
+    {
+      "type": "slider",
+      "name": "academy:countdown",
+      "text": "Countdown (seconds)",
+      "min": 3,
+      "max": 10,
+      "step": 1,
+      "default": 5
     }
   ]
 }

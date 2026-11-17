@@ -65,12 +65,16 @@ export const SCOUT_TARGETS = {
 };
 
 /**
- * Scan a box around the player for any of `types`, spread over several ticks.
- * Returns { nearest: Vector3, dist, count, cluster } or undefined.
+ * Scan a box around `center` in `dim` for any of `types`, spread over several ticks.
+ * `accept(loc)` can reject matches (e.g. a chest that isn't in a shipwreck).
+ * Returns { nearest, dist, count, cluster } or undefined.
+ * @param {import("@minecraft/server").Dimension} dim
+ * @param {import("@minecraft/server").Vector3} center
+ * @param {string[]} types
+ * @param {{ radius?: number, below?: number, above?: number, accept?: (loc: import("@minecraft/server").Vector3) => boolean }} [opts]
  */
-export async function scan(player, types, radius = 48, below = 32, above = 24) {
-  const dim = player.dimension;
-  const c = player.location;
+export async function scanAt(dim, center, types, { radius = 48, below = 32, above = 24, accept } = {}) {
+  const c = center;
   const ymin = Math.max(dim.heightRange.min, Math.floor(c.y - below));
   const ymax = Math.min(dim.heightRange.max - 1, Math.floor(c.y + above));
   const cx = Math.floor(c.x);
@@ -88,6 +92,7 @@ export async function scan(player, types, radius = 48, below = 32, above = 24) {
         { x: Math.min(x + STEP - 1, cx + radius), y: ymax, z: cz + radius }
       );
       for (const loc of dim.getBlocks(vol, { includeTypes: types }, true).getBlockLocationIterator()) {
+        if (accept && !accept(loc)) continue;
         count++;
         if (sample.length < 4000) sample.push(loc);
         const d = (loc.x - c.x) ** 2 + (loc.y - c.y) ** 2 + (loc.z - c.z) ** 2;
@@ -104,6 +109,11 @@ export async function scan(player, types, radius = 48, below = 32, above = 24) {
   if (!nearest) return undefined;
   const cluster = sample.filter((l) => Math.abs(l.x - nearest.x) <= 4 && Math.abs(l.y - nearest.y) <= 2 && Math.abs(l.z - nearest.z) <= 4).length;
   return { nearest, dist: Math.round(Math.sqrt(best)), count, cluster };
+}
+
+/** Scan around the player. */
+export function scan(player, types, radius = 48, below = 32, above = 24) {
+  return scanAt(player.dimension, player.location, types, { radius, below, above });
 }
 
 /** "ahead", "right", "behind-left"... relative to where the player is looking. */

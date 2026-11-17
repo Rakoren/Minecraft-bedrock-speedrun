@@ -4,7 +4,28 @@ A **practice-only** behavior pack that teaches Bedrock Any% speedrunning. It has
 
 > ⚠️ Never have this pack on during a real run. Leaderboards require vanilla Minecraft. Behavior packs also disable achievements on the world they're applied to.
 
-## Guided Run + Checklist (new in 0.2)
+## World setup (new in 0.3)
+
+When you add the pack to a world, its **pack settings** show up on the world settings screen before you create the world:
+
+| Setting | Options |
+|---|---|
+| Mode | Practice / Guided run, Race: same world, Race: same seed |
+| Start type | Random, Village, Ruined portal, Shipwreck, Buried treasure, Lava pool |
+| Allow Scout | on/off (always off in races) |
+| PvP in same-world races | on/off |
+| Countdown | 3-10 s |
+
+You can change all of these later from the book under **World setup**.
+
+**How start types work:** the world generates before any pack code runs, so the pack can't change *what* generates. Instead, on first load it hunts for your start: it uses biome search from the seed to pick likely spots, loads each one, scans for signature blocks (a bell for villages, netherrack or crying obsidian for ruined portals, a chest next to wood underwater for shipwrecks, and so on), then moves the world spawn next to what it finds. Every timed run and race begins there.
+
+## Races (new in 0.3)
+
+- **Same world:** someone opens a lobby from the book, others join, and the host starts. Everyone gets teleported to the start, cleared, frozen for a synced countdown, then released. The sidebar shows live standings (phase plus last split), and chat announces each split. The first player to kill the dragon wins. The dragon is shared, so the End gets messy. This works on Realms, LAN and dedicated servers.
+- **Same seed, separate worlds:** each racer creates their own world with the same seed and start type. The host makes a race code that includes the start time and a seed check, and the others enter it. Every world's GO happens at the same real-world moment, based on device clocks. There's no live connection between worlds, so compare times at the end. Live cross-world standings would need a small web relay, which is a possible future addition.
+
+## Guided Run + Checklist (0.2)
 
 A full Any% run with coaching:
 
@@ -44,7 +65,7 @@ Lessons 2-4 edit the terrain around you (lava pool, arenas). Use a throwaway pra
 
 ## Requirements
 
-Minecraft Bedrock **1.21.90+**. It uses the stable Script API (`@minecraft/server` 2.0.0), so you don't need any experimental toggles.
+Minecraft Bedrock **1.26.50+**. It uses the stable Script API (`@minecraft/server` 2.9.0, for pack settings, the world seed and biome search) and manifest format 3, so you don't need any experimental toggles.
 
 ## Install
 

@@ -3,6 +3,8 @@ import { ActionFormData, MessageFormData } from "@minecraft/server-ui";
 import { PHASES, getPhase, evaluate, nextItem, inventoryReport, arrangeHotbar } from "./checklist.js";
 import { SCOUT_TARGETS, scan, direction } from "./scout.js";
 import { markThrow } from "./tri.js";
+import { getSetting } from "./settings.js";
+import { goToStart } from "./startfinder.js";
 import { fmt, cmd, showForm, resetPlayer, sleep, countItem, container } from "./util.js";
 
 /** player.id -> run */
@@ -70,7 +72,14 @@ function clearSidebar() {
 
 // ---------------- lifecycle ----------------
 
-export async function startRun(player, timed, onStop) {
+/** Race modules hook in here to track standings. */
+export const runHooks = { onSplit: undefined, onFinish: undefined };
+
+/**
+ * opts.race     - race id; the sidebar is left to the race standings
+ * opts.startAt  - wall-clock ms when GO should happen (keeps racers in sync)
+ */
+export async function startRun(player, timed, onStop, opts = {}) {
   stopRun(player, true);
   const run = {
     player,
@@ -84,29 +93,50 @@ export async function startRun(player, timed, onStop) {
     assisted: false,
     done: new Set(),
     onStop,
+    race: opts.race,
   };
   runs.set(player.id, run);
-  sidebarOwner = player.id;
+  if (!run.race || run.race === "seed") sidebarOwner = player.id;
   world.gameRules.showCoordinates = true;
 
   if (timed) {
     resetPlayer(player);
+    goToStart(player);
     run.phaseId = "overworld";
-    cmd(player, "effect @s slowness 3 255 true");
-    for (const n of ["§c3", "§e2", "§a1"]) {
-      player.onScreenDisplay.setTitle(n, { fadeInDuration: 0, stayDuration: 18, fadeOutDuration: 2 });
-      cmd(player, "playsound note.hat @s");
-      await sleep(20);
+    const secs = Math.max(3, Math.round(Number(getSetting("countdown")) || 5));
+    const goAt = opts.startAt ?? Date.now() + secs * 1000;
+    // wait (frozen) until the countdown window, then count down to goAt
+    while (goAt - Date.now() > secs * 1000) {
+      cmd(player, "effect @s slowness 2 255 true");
+      player.onScreenDisplay.setActionBar(`§eRace starts in ${fmt(goAt - Date.now()).replace(/\.\d+$/, "")}`);
+      await sleep(10);
       if (runs.get(player.id) !== run) return;
     }
+    let shown = -1;
+    while (Date.now() < goAt) {
+      const left = Math.ceil((goAt - Date.now()) / 1000);
+      if (left !== shown) {
+        shown = left;
+        cmd(player, "effect @s slowness 2 255 true");
+        player.onScreenDisplay.setTitle(`${left <= 1 ? "§a" : left <= 3 ? "§e" : "§c"}${left}`, { fadeInDuration: 0, stayDuration: 18, fadeOutDuration: 2 });
+        cmd(player, "playsound note.hat @s");
+      }
+      await sleep(1);
+      if (runs.get(player.id) !== run) return;
+    }
+    run.startMs = goAt;
     cmd(player, "effect @s clear");
     player.onScreenDisplay.setTitle("§aGO!", { fadeInDuration: 0, stayDuration: 15, fadeOutDuration: 5 });
     cmd(player, "playsound note.pling @s");
   }
-  run.startMs = Date.now();
+  run.startMs ||= Date.now();
   // pre-mark already-finished items so we don't spam "done!" for stuff you had
   for (const r of evaluate(player, run, getPhase(run.phaseId))) if (r.done) run.done.add(`${run.phaseId}:${r.item.id}`);
-  player.sendMessage(`§6Guided run started.§7 Checklist is on the right. Open the book for hints, pathing guides, Scout and inventory check.`);
+  player.sendMessage(
+    run.race
+      ? "§6GO!§7 Race standings are on the right. Your next item is on the action bar, and the full checklist is in the book."
+      : "§6Guided run started.§7 Checklist is on the right. Open the book for hints, pathing guides, Scout and inventory check."
+  );
 }
 
 export function stopRun(player, silent = false) {
@@ -132,6 +162,7 @@ function setPhase(run, phaseId) {
   const from = getPhase(run.phaseId);
   run.splits.push({ id: from.id, name: from.name, at: t });
   run.phaseId = phaseId;
+  runHooks.onSplit?.(run);
   const to = getPhase(phaseId);
   for (const r of evaluate(run.player, run, to)) if (r.done) run.done.add(`${to.id}:${r.item.id}`);
   run.player.onScreenDisplay.setTitle(`§e${to.name}`, {
@@ -152,8 +183,13 @@ export function onDimensionChange(player, toId) {
   run.target = undefined;
 }
 
-export function onDragonDeath() {
-  for (const run of [...runs.values()]) if (run.startMs && run.phaseId === "end") finishRun(run);
+/** killer: the player who landed the final hit (if any). In a same-world race only they finish. */
+export function onDragonDeath(killer) {
+  for (const run of [...runs.values()]) {
+    if (!run.startMs || run.phaseId !== "end") continue;
+    if (run.race && killer && run.player.id !== killer.id) continue;
+    finishRun(run);
+  }
 }
 
 function finishRun(run) {
@@ -161,6 +197,7 @@ function finishRun(run) {
   const total = Date.now() - run.startMs;
   run.splits.push({ id: "end", name: "The End", at: total });
   runs.delete(player.id);
+  runHooks.onFinish?.(run, total);
   if (sidebarOwner === player.id) clearSidebar();
 
   if (!run.timed) {
@@ -286,7 +323,7 @@ export async function runMenu(player) {
   add("What do I do next?", () => showNext(player, run), "textures/items/compass_item");
   add("Phase guide (pathing)", () => showGuide(player, run.phaseId), "textures/items/map_filled");
   add("Full checklist + tips", () => showChecklist(player, run), "textures/items/book_writable");
-  if ((SCOUT_TARGETS[player.dimension.id] ?? []).length) add("Scout nearby §8(training wheels)", () => scoutMenu(player, run), "textures/items/spyglass");
+  if (getSetting("scout") && !run.race && (SCOUT_TARGETS[player.dimension.id] ?? []).length) add("Scout nearby §8(training wheels)", () => scoutMenu(player, run), "textures/items/spyglass");
   if (run.phaseId === "stronghold" || countItem(player, "minecraft:ender_eye") > 0)
     add("Mark eye throw", () => markThrow(player, run.tri), "textures/items/ender_eye");
   add("Inventory check", () => inventoryMenu(player, run), "textures/blocks/chest_front");

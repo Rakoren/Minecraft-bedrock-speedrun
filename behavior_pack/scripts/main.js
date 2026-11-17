@@ -1,8 +1,11 @@
 import { world, system, Player } from "@minecraft/server";
-import { ActionFormData, MessageFormData } from "@minecraft/server-ui";
+import { ActionFormData, MessageFormData, ModalFormData } from "@minecraft/server-ui";
 import { LESSONS, getLesson } from "./lessons.js";
 import { fmt, cmd, showForm, isBook, giveBook, resetPlayer, sleep } from "./util.js";
 import { runs, runMenu, runStartMenu, stopRun, onDimensionChange, onDragonDeath } from "./run.js";
+import { worldRaceMenu, seedRaceMenu } from "./race.js";
+import { getSetting, setSetting, MODES, START_TYPES, modeName, startName } from "./settings.js";
+import { findStart, isFindingStart, savedStart } from "./startfinder.js";
 
 /** player.id -> { lesson, state, startMs (0 until GO), player } */
 const sessions = new Map();
@@ -14,21 +17,64 @@ async function openMenu(player) {
   if (s) return sessionMenu(player, s);
   if (runs.has(player.id)) return runMenu(player);
 
+  if (isFindingStart()) return player.sendMessage("§7Still searching for your start, hang on...");
+  const mode = getSetting("mode");
+  const startType = String(world.getDynamicProperty("start:type") ?? getSetting("start"));
+  const back = () => openMenu(player);
   const form = new ActionFormData()
     .title("Speedrun Academy")
-    .body("§7Do a §fGuided Run§7 with a live checklist, or drill one piece of the route in a lesson.");
-  form.button("§6Guided Run + Checklist", "textures/items/map_filled");
+    .body(`§fMode:§7 ${modeName(mode)}\n§fStart:§7 ${startName(startType)}${savedStart() ? " §a(found)" : ""}\n\n§7Do a §fGuided Run§7 with a live checklist, race, or drill one piece of the route in a lesson.`);
+  const buttons = [];
+  const add = (label, fn, icon) => {
+    form.button(label, icon);
+    buttons.push(fn);
+  };
+  if (mode === "race_world") add("§6Race (same world)", () => worldRaceMenu(player, back), "textures/items/diamond_sword");
+  if (mode === "race_seed") add("§6Race (same seed)", () => seedRaceMenu(player, back), "textures/items/diamond_sword");
+  add(mode === "practice" ? "§6Guided Run + Checklist" : "Guided Run + Checklist", () => runStartMenu(player, back), "textures/items/map_filled");
   for (const l of LESSONS) {
     const pb = getPB(player, l.id);
-    form.button(l.read ? l.name : `${l.name}${pb ? `\n§2PB ${fmt(pb)}` : "\n§8no PB yet"}`, l.icon);
+    add(l.read ? l.name : `${l.name}${pb ? `\n§2PB ${fmt(pb)}` : "\n§8no PB yet"}`, () => lessonIntro(player, l), l.icon);
   }
-  form.button("Personal Bests", "textures/items/clock_item");
+  add("Personal Bests", () => showPBs(player), "textures/items/clock_item");
+  add("World setup", () => worldSetup(player), "textures/items/redstone_dust");
 
   const res = await showForm(player, form);
   if (!res || res.canceled || res.selection === undefined) return;
-  if (res.selection === 0) return runStartMenu(player, () => openMenu(player));
-  if (res.selection === LESSONS.length + 1) return showPBs(player);
-  return lessonIntro(player, LESSONS[res.selection - 1]);
+  return buttons[res.selection]();
+}
+
+async function worldSetup(player) {
+  const mode = getSetting("mode");
+  const start = String(world.getDynamicProperty("start:type") ?? getSetting("start"));
+  const res = await showForm(
+    player,
+    new ModalFormData()
+      .title("World setup")
+      .dropdown("Mode", MODES.map((m) => m.name), { defaultValueIndex: Math.max(0, MODES.findIndex((m) => m.id === mode)) })
+      .dropdown("Start type (moves world spawn)", START_TYPES.map((s) => s.name), { defaultValueIndex: Math.max(0, START_TYPES.findIndex((s) => s.id === start)) })
+      .toggle("Search for that start now", { defaultValue: false })
+      .toggle("Allow Scout (training wheels)", { defaultValue: !!getSetting("scout") })
+      .toggle("PvP during same-world races", { defaultValue: !!getSetting("pvp") })
+      .slider("Countdown (seconds)", 3, 10, { valueStep: 1, defaultValue: Number(getSetting("countdown")) || 5 })
+      .submitButton("Save")
+  );
+  if (!res || res.canceled || !res.formValues) return;
+  const [m, s, search, scout, pvp, countdown] = res.formValues;
+  setSetting("mode", MODES[Number(m)].id);
+  setSetting("scout", !!scout);
+  setSetting("pvp", !!pvp);
+  setSetting("countdown", Number(countdown));
+  const newStart = START_TYPES[Number(s)].id;
+  setSetting("start", newStart);
+  player.sendMessage("§aSettings saved.");
+  if (search) {
+    if (newStart === "random") {
+      world.setDynamicProperty("start:loc", undefined);
+      world.setDynamicProperty("start:type", "random");
+      player.sendMessage("§7Start set to random: runs begin wherever you are.");
+    } else await findStart(player, newStart);
+  }
 }
 
 async function lessonIntro(player, lesson, page = 0) {
@@ -196,7 +242,20 @@ system.afterEvents.scriptEventReceive.subscribe(({ id, sourceEntity }) => {
   if (id === "academy:menu" && sourceEntity instanceof Player) openMenu(sourceEntity);
 });
 
-world.afterEvents.playerSpawn.subscribe(({ player }) => giveBook(player));
+world.afterEvents.playerSpawn.subscribe(({ player, initialSpawn }) => {
+  giveBook(player);
+  if (!initialSpawn) return;
+  // First time this world loads: go find the start type picked in pack settings.
+  const start = getSetting("start");
+  if (start !== "random" && !world.getDynamicProperty("start:done")) {
+    system.runTimeout(() => {
+      if (player.isValid && !world.getDynamicProperty("start:done")) findStart(player, start);
+    }, 60);
+  } else if (!world.getDynamicProperty("academy:welcomed")) {
+    world.setDynamicProperty("academy:welcomed", true);
+    player.sendMessage(`§6Speedrun Academy§7 is on (${modeName(getSetting("mode"))}). Use the book in your hotbar to begin.`);
+  }
+});
 
 world.afterEvents.playerDimensionChange.subscribe(({ player, toDimension }) => {
   const s = sessions.get(player.id);
@@ -204,10 +263,11 @@ world.afterEvents.playerDimensionChange.subscribe(({ player, toDimension }) => {
   onDimensionChange(player, toDimension.id);
 });
 
-world.afterEvents.entityDie.subscribe(({ deadEntity }) => {
+world.afterEvents.entityDie.subscribe(({ deadEntity, damageSource }) => {
   if (deadEntity.typeId === "minecraft:ender_dragon") {
     for (const s of [...sessions.values()]) if (s.startMs && s.lesson.onDragonDeath) finish(s);
-    onDragonDeath();
+    const killer = damageSource?.damagingEntity;
+    onDragonDeath(killer instanceof Player ? killer : undefined);
     return;
   }
   if (deadEntity instanceof Player) {

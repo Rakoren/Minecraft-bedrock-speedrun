@@ -1,16 +1,16 @@
 {
   "name": "speedrun-academy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Bedrock practice add-on that teaches speedrunning",
   "scripts": {
     "check": "tsc -p jsconfig.json && node tools/check-ids.mjs",
-    "test": "node --no-warnings tools/test/checklist.test.mjs",
+    "test": "node --no-warnings tools/test/checklist.test.mjs && node --no-warnings tools/test/race.test.mjs",
     "build": "bash tools/build.sh"
   },
   "devDependencies": {
-    "@minecraft/server": "2.0.0",
-    "@minecraft/server-ui": "2.0.0",
+    "@minecraft/server": "^2.9.0",
+    "@minecraft/server-ui": "^2.0.0",
     "typescript": "^5.6.0"
   }
 }
