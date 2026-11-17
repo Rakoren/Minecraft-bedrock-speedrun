@@ -24,8 +24,9 @@ const KEYS = {
   scout: "academy:allow_scout",
   pvp: "academy:race_pvp",
   countdown: "academy:countdown",
+  ghost: "academy:show_ghost",
 };
-const DEFAULTS = { mode: "practice", start: "random", scout: true, pvp: false, countdown: 5 };
+const DEFAULTS = { mode: "practice", start: "random", scout: true, pvp: false, countdown: 5, ghost: true };
 const LISTS = { mode: MODES, start: START_TYPES };
 
 /** Normalise whatever the engine hands back (option name, index, or namespaced name). */

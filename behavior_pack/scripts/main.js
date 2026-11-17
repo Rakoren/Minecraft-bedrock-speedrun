@@ -56,14 +56,16 @@ async function worldSetup(player) {
       .toggle("Search for that start now", { defaultValue: false })
       .toggle("Allow Scout (training wheels)", { defaultValue: !!getSetting("scout") })
       .toggle("PvP during same-world races", { defaultValue: !!getSetting("pvp") })
+      .toggle("Show my PB ghost in timed runs", { defaultValue: !!getSetting("ghost") })
       .slider("Countdown (seconds)", 3, 10, { valueStep: 1, defaultValue: Number(getSetting("countdown")) || 5 })
       .submitButton("Save")
   );
   if (!res || res.canceled || !res.formValues) return;
-  const [m, s, search, scout, pvp, countdown] = res.formValues;
+  const [m, s, search, scout, pvp, ghost, countdown] = res.formValues;
   setSetting("mode", MODES[Number(m)].id);
   setSetting("scout", !!scout);
   setSetting("pvp", !!pvp);
+  setSetting("ghost", !!ghost);
   setSetting("countdown", Number(countdown));
   const newStart = START_TYPES[Number(s)].id;
   setSetting("start", newStart);

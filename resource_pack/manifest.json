@@ -1,0 +1,29 @@
+{
+  "format_version": 2,
+  "header": {
+    "name": "Speedrun Academy (visuals)",
+    "description": "Ghost model for Speedrun Academy. Install together with the behavior pack.",
+    "uuid": "3dd338f6-a716-48b0-b49d-3926b9adf430",
+    "version": [
+      0,
+      4,
+      0
+    ],
+    "min_engine_version": [
+      1,
+      26,
+      50
+    ]
+  },
+  "modules": [
+    {
+      "type": "resources",
+      "uuid": "f8662ba3-5967-4e30-bc1d-e90e0a427f61",
+      "version": [
+        0,
+        4,
+        0
+      ]
+    }
+  ]
+}

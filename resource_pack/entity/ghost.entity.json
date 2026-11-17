@@ -1,0 +1,14 @@
+{
+  "format_version": "1.10.0",
+  "minecraft:client_entity": {
+    "description": {
+      "identifier": "academy:ghost",
+      "materials": { "default": "entity_alphablend" },
+      "textures": { "default": "textures/entity/academy_ghost" },
+      "geometry": { "default": "geometry.humanoid.custom" },
+      "animations": { "walk": "animation.academy_ghost.walk" },
+      "scripts": { "animate": ["walk"] },
+      "render_controllers": ["controller.render.default"]
+    }
+  }
+}

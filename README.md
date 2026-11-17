@@ -4,7 +4,21 @@ A **practice-only** behavior pack that teaches Bedrock Any% speedrunning. It has
 
 > ⚠️ Never have this pack on during a real run. Leaderboards require vanilla Minecraft. Behavior packs also disable achievements on the world they're applied to.
 
-## World setup (new in 0.3)
+## PB ghost (new in 0.4)
+
+During every timed guided run, the pack records where you go (twice a second). When you finish a run that beats your saved ghost on this seed, that run becomes your **PB ghost**. On later attempts a see-through blue player replays it alongside you:
+
+- Within ~80 blocks you see the ghost itself, with smooth movement and a walk animation. It snaps through portals and ender pearl throws instead of sliding.
+- Farther away, or in another dimension, the action bar tells you where it is ("Ghost 120m ahead-left", "Ghost is in the nether").
+- Each split tells you how far ahead or behind the ghost you are, and the finish tells you whether you beat it.
+- Ghosts are saved per player and per seed. Runs that used Scout don't save a ghost, and same-world races don't show one.
+- Delete your ghost from the Guided Run screen. Hide it with the "Race my PB ghost" toggle in pack settings or World setup.
+
+The ghost needs the **resource pack**. Install the `.mcaddon`, which contains both packs, and make sure both are on the world.
+
+Tip: mined blocks and looted chests stay that way between attempts. Keep a backup copy of a fresh world (World settings → Copy World) and play the copies.
+
+## World setup (0.3)
 
 When you add the pack to a world, its **pack settings** show up on the world settings screen before you create the world:
 
@@ -73,7 +87,7 @@ Minecraft Bedrock **1.26.50+**. It uses the stable Script API (`@minecraft/serve
 npm install
 npm run check   # typecheck scripts against the Script API + validate item/block ids
 npm test        # checklist logic tests (mocked game API)
-npm run build   # -> dist/SpeedrunAcademy.mcpack
+npm run build   # -> dist/SpeedrunAcademy.mcaddon (behavior + resource pack)
 ```
 
-Open the `.mcpack` on your device and Minecraft imports it. Then create a new world and add **Speedrun Academy** under Behavior Packs.
+Open the `.mcaddon` on your device and Minecraft imports both packs. Then create a new world and add **Speedrun Academy** under Behavior Packs. The resource pack gets added automatically because the behavior pack depends on it.

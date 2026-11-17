@@ -5,6 +5,7 @@ import { SCOUT_TARGETS, scan, direction } from "./scout.js";
 import { markThrow } from "./tri.js";
 import { getSetting } from "./settings.js";
 import { goToStart } from "./startfinder.js";
+import { beginGhost, endGhost, finishGhost, ghostSplitDelta, ghostStatus, hasGhost, deleteGhost } from "./ghost.js";
 import { fmt, cmd, showForm, resetPlayer, sleep, countItem, container } from "./util.js";
 
 /** player.id -> run */
@@ -130,6 +131,7 @@ export async function startRun(player, timed, onStop, opts = {}) {
     cmd(player, "playsound note.pling @s");
   }
   run.startMs ||= Date.now();
+  if (timed) beginGhost(run);
   // pre-mark already-finished items so we don't spam "done!" for stuff you had
   for (const r of evaluate(player, run, getPhase(run.phaseId))) if (r.done) run.done.add(`${run.phaseId}:${r.item.id}`);
   player.sendMessage(
@@ -143,6 +145,7 @@ export function stopRun(player, silent = false) {
   const run = runs.get(player.id);
   if (!run) return;
   runs.delete(player.id);
+  endGhost(run);
   if (sidebarOwner === player.id) {
     clearSidebar();
     sidebarOwner = undefined;
@@ -171,7 +174,7 @@ function setPhase(run, phaseId) {
     stayDuration: 40,
     fadeOutDuration: 10,
   });
-  run.player.sendMessage(`§e${from.name} done${run.timed ? ` at §f${fmt(t)}` : ""}§e. Next up: §f${to.name}§7 (book -> Phase guide for pathing tips)`);
+  run.player.sendMessage(`§e${from.name} done${run.timed ? ` at §f${fmt(t)}${ghostSplitDelta(run, from.id, t)}` : ""}§e. Next up: §f${to.name}§7 (book -> Phase guide for pathing tips)`);
 }
 
 export function onDimensionChange(player, toId) {
@@ -208,6 +211,7 @@ function finishRun(run) {
   const countsForPB = !run.assisted;
   const isPB = countsForPB && (!pb || total < pb);
   if (isPB) player.setDynamicProperty("run:pb", total);
+  finishGhost(run, total, countsForPB);
 
   const lines = [`§6=== Run complete: §f${fmt(total)} ${isPB ? "§6NEW PB!" : ""}`];
   let prev = 0;
@@ -292,6 +296,8 @@ system.runInterval(() => {
         }
       }
       const inv = container(p);
+      const g = run.timed ? ghostStatus(run) : "";
+      if (g) bar.push(g);
       if (inv && inv.emptySlotsCount <= 3) bar.push("§cInventory almost full! Book -> Inventory check");
       p.onScreenDisplay.setActionBar(bar.join("\n"));
     } catch (e) {
@@ -450,16 +456,26 @@ export async function runStartMenu(player, back) {
       .title("Guided Run")
       .body(
         "§7A full Any% run with a §fchecklist on the right side of the screen§7 that updates from your inventory, plus hints, pathing guides, a Scout and an inventory coach in this book.\n\n" +
-          `§fBest guided run:§7 ${pb ? fmt(pb) : "none yet"}\n\n` +
-          "§fTimed run:§7 clears your inventory, 3-2-1, splits per phase. Use a §cbrand new world§7.\n" +
-          "§fChecklist only:§7 keeps your stuff, no timer. Good for just learning while you play."
+          `§fBest guided run:§7 ${pb ? fmt(pb) : "none yet"}\n` +
+          `§fPB ghost:§7 ${hasGhost(player) ? `saved (${fmt(Number(player.getDynamicProperty("ghost:total")))})${getSetting("ghost") ? "" : " §8- hidden in World setup"}` : "none yet, finish a timed run to make one"}\n\n` +
+          "§fTimed run:§7 clears your inventory, 3-2-1, splits per phase. Your PB ghost races you.\n" +
+          "§fChecklist only:§7 keeps your stuff, no timer. Good for just learning while you play.\n\n" +
+          "§8Tip: mined blocks and looted chests stay that way. For a truly fresh attempt, keep a backup copy of the world (World settings -> Copy World) and play the copy."
       )
       .button("§aTimed run (fresh start)", "textures/items/clock_item")
       .button("Checklist only", "textures/items/book_writable")
+      .button(hasGhost(player) ? "§cDelete my PB ghost" : "§8(no ghost yet)")
       .button("Back")
   );
   if (!res || res.canceled || res.selection === undefined) return;
-  if (res.selection === 2) return back();
+  if (res.selection === 3) return back();
+  if (res.selection === 2) {
+    if (hasGhost(player)) {
+      deleteGhost(player);
+      player.sendMessage("§7PB ghost deleted. Your next finished timed run becomes the new ghost.");
+    }
+    return runStartMenu(player, back);
+  }
   return startRun(player, res.selection === 0);
 }
 
